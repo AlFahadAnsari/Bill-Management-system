@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -19,6 +20,8 @@ const Label = React.forwardRef<
     ref={ref}
     className={cn(labelVariants(), className)}
     {...props}
+    // Ensure it renders as a <label> tag by default for accessibility
+    asChild={false}
   />
 ))
 Label.displayName = LabelPrimitive.Root.displayName

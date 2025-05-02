@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -34,6 +35,7 @@ interface ComboboxProps {
   emptyPlaceholder?: string
   className?: string
   triggerClassName?: string
+  inputId?: string; // Add inputId prop
 }
 
 export function Combobox({
@@ -45,6 +47,7 @@ export function Combobox({
   emptyPlaceholder = "No option found.",
   className,
   triggerClassName,
+  inputId, // Destructure inputId
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
 
@@ -66,9 +69,11 @@ export function Combobox({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild className={triggerClassName}>
         <Button
+          id={inputId} // Set the id on the trigger button
           variant="outline"
           role="combobox"
           aria-expanded={open}
+          aria-labelledby={inputId ? `${inputId}-label` : undefined} // Associate with label if inputId is provided
           className={cn("w-full justify-between", !value && "text-muted-foreground", className)}
         >
           {value ? selectedLabel : placeholder}
@@ -77,7 +82,7 @@ export function Combobox({
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
         <Command>
-          <CommandInput placeholder={searchPlaceholder} />
+          <CommandInput placeholder={searchPlaceholder} aria-label={searchPlaceholder} />
           <CommandList>
             <CommandEmpty>{emptyPlaceholder}</CommandEmpty>
             {Object.entries(groupedOptions).map(([groupKey, groupOptions]) => (

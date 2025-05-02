@@ -1,7 +1,8 @@
+
 "use client"
 
 import * as React from "react"
-import { PlusCircle, Printer, ReceiptText } from "lucide-react"
+import { PlusCircle, Printer, ReceiptText, User } from "lucide-react" // Added User icon
 
 import type { Product, BillItem } from "@/types"
 import { Button } from "@/components/ui/button"
@@ -16,6 +17,8 @@ import {
   TableFooter
 } from "@/components/ui/table"
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox"
+import { Input } from "@/components/ui/input" // Added Input import
+import { Label } from "@/components/ui/label" // Added Label import
 import { BillItemRow } from "./bill-item-row"
 import { BillPreviewDialog } from "./bill-preview-dialog"
 import { useToast } from "@/hooks/use-toast"
@@ -27,6 +30,7 @@ interface BillGeneratorProps {
 export function BillGenerator({ availableProducts }: BillGeneratorProps) {
   const [billItems, setBillItems] = React.useState<BillItem[]>([])
   const [selectedProductId, setSelectedProductId] = React.useState<string>("")
+  const [clientName, setClientName] = React.useState<string>("") // State for client name
   const [showPreview, setShowPreview] = React.useState(false)
   const { toast } = useToast();
 
@@ -90,6 +94,14 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
   }, [billItems]);
 
   const handleGenerateBill = () => {
+     if (!clientName.trim()) {
+       toast({
+         title: "Client Name Required",
+         description: "Please enter the client's name.",
+         variant: "destructive",
+       });
+       return;
+     }
     if (billItems.length === 0 || billItems.every(item => item.quantity === 0)) {
        toast({
          title: "Cannot Generate Bill",
@@ -111,9 +123,24 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Client Name Input */}
+          <div className="space-y-2">
+            <Label htmlFor="client-name" className="flex items-center">
+                <User className="mr-2 h-4 w-4 text-muted-foreground" /> Client Name
+            </Label>
+            <Input
+                id="client-name"
+                placeholder="Enter client's name"
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                className="h-10"
+            />
+          </div>
+
+          {/* Product Selection and Add Button */}
           <div className="flex items-end gap-2">
             <div className="flex-grow">
-              <label htmlFor="product-select" className="text-sm font-medium mb-1 block">Select Product</label>
+              <Label htmlFor="product-select" className="text-sm font-medium mb-1 block">Select Product</Label>
               <Combobox
                 options={productOptions}
                 value={selectedProductId}
@@ -122,13 +149,15 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
                 searchPlaceholder="Search products..."
                 emptyPlaceholder="No products found."
                 triggerClassName="h-10" // Match button height
+                inputId="product-select" // Link label
               />
             </div>
-            <Button onClick={addProductToBill} aria-label="Add selected product to bill">
+            <Button onClick={addProductToBill} aria-label="Add selected product to bill" className="h-10">
               <PlusCircle className="mr-2 h-4 w-4" /> Add to Bill
             </Button>
           </div>
 
+          {/* Bill Items Table */}
           <div className="rounded-md border mt-4">
              <Table>
                <TableHeader>
@@ -181,6 +210,7 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
       <BillPreviewDialog
           isOpen={showPreview}
           onClose={() => setShowPreview(false)}
+          clientName={clientName} // Pass client name
           items={billItems.filter(item => item.quantity > 0)} // Only include items with quantity > 0
           totalAmount={totalAmount}
         />
