@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from 'react';
@@ -36,10 +35,18 @@ interface BillPreviewDialogProps {
 export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmount }: BillPreviewDialogProps) {
   const billContentRef = React.useRef<HTMLDivElement>(null);
   const [printDate, setPrintDate] = React.useState<Date | null>(null);
+  const [currentTime, setCurrentTime] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (isOpen) {
       setPrintDate(new Date()); // Set print date when dialog opens
+    }
+  }, [isOpen]);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      // Get current time only on client side
+      setCurrentTime(new Date().toLocaleTimeString());
     }
   }, [isOpen]);
 
@@ -48,7 +55,7 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
      let billText = `*Invoice / Bill*\n`;
      billText += `*Client:* ${clientName}\n`;
      billText += `*Date:* ${printDate ? printDate.toLocaleDateString() : 'N/A'}\n`;
-     billText += `*Time:* ${printDate ? printDate.toLocaleTimeString() : 'N/A'}\n\n`;
+     billText += `*Time:* ${currentTime || 'N/A'}\n\n`;
      billText += `*Items:*\n`;
      billText += `--------------------\n`;
      items.forEach(item => {
@@ -156,7 +163,7 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
               <div className="mb-4 client-info"> {/* Added client-info class */}
                  <p><strong>Client:</strong> {clientName}</p>
                  <p><strong>Date:</strong> {printDate ? printDate.toLocaleDateString() : 'N/A'}</p>
-                 <p><strong>Time:</strong> {printDate ? printDate.toLocaleTimeString() : 'N/A'}</p>
+                 <p><strong>Time:</strong> {currentTime || 'N/A'}</p>
                </div>
 
 
@@ -209,3 +216,4 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
     </Dialog>
   );
 }
+
