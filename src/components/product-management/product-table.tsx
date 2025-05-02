@@ -1,4 +1,3 @@
-// src/components/product-management/product-table.tsx
 "use client"
 
 import * as React from "react"
@@ -145,4 +144,5 @@ export function ProductTable({ products, onDelete, onUpdate }: ProductTableProps
     </>
   )
 }
+
 
