@@ -36,7 +36,7 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
 
   // No need for separate category fetching if availableProducts includes categories
   // const [categories, setCategories] = React.useState<ComboboxOption[]>([]);
-  // const [isLoadingCategories, setIsLoadingCategories] = React.useState(true);
+  // const [isLoadingCategories] = React.useState(true);
 
   // Group products by category for the Combobox
   const productOptions: ComboboxOption[] = React.useMemo(() => {
@@ -223,13 +223,13 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
                  )}
                </TableBody>
                 {billItems.length > 0 && (
-                 
+                  <TableFooter>
                    <TableRow className="bg-muted/50 font-semibold">
                      <TableCell colSpan={4} className="text-right">Total Amount:</TableCell>
                      <TableCell className="text-right font-bold text-lg">₹{totalAmount.toFixed(2)}</TableCell>
                      <TableCell></TableCell>{/* Empty cell for remove column */}
                    </TableRow>
-                 
+                  </TableFooter>
                  )}
              </Table>
           </div>
@@ -256,4 +256,5 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
     </>
   )
 }
+
 

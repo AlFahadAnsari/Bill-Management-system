@@ -16,7 +16,8 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+// Correct import for autoTable
+import 'jspdf-autotable';
 import { useToast } from "@/hooks/use-toast"; // Import useToast
 
 // Inline SVG for WhatsApp icon
@@ -305,4 +306,5 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
     </Dialog>
   );
 }
+
 
