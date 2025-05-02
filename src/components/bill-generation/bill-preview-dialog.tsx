@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from 'react';
@@ -16,6 +15,8 @@ import {
 } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // Inline SVG for WhatsApp icon
 const WhatsAppIcon = () => (
@@ -47,32 +48,63 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
   }, [isOpen]);
 
 
- const getBillTextForShare = (): string => {
-     let billText = `*Invoice / Bill*\n\n`;
-     billText += `*Client:* ${clientName}\n`;
-     billText += `*Date:* ${printDate ? printDate.toLocaleDateString() : 'N/A'}\n`;
-     billText += `*Time:* ${currentTime || 'N/A'}\n\n`;
-     billText += `*Items:*\n`;
-     billText += `--------------------\n`;
-     items.forEach(item => {
-         billText += `${item.name} (Qty: ${item.quantity}) - ₹${(item.price * item.quantity).toFixed(2)}\n`;
-     });
-     billText += `--------------------\n`;
-     billText += `*Total Amount:* ₹${totalAmount.toFixed(2)}\n\n`;
-     billText += `Thank you!`;
-     return billText;
-  };
+  const generatePdf = async () => {
+    const doc = new jsPDF();
 
-  const handleWhatsAppShare = () => {
-     // Note: Sharing a generated PDF directly via a wa.me link is not directly supported by WhatsApp Web/Mobile APIs from the client-side.
-     // This implementation shares the bill details as formatted text.
-     // For PDF sharing, a backend service would typically be needed to generate and host the PDF, then share its link.
-     const billText = getBillTextForShare();
-     const encodedText = encodeURIComponent(billText);
-     const whatsappUrl = `https://wa.me/?text=${encodedText}`;
-     window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
-  };
+    // Add title and client information
+    doc.setFontSize(18);
+    doc.text('Bill / Invoice', 14, 20);
 
+    doc.setFontSize(12);
+    doc.text(`Client: ${clientName}`, 14, 30);
+    doc.text(`Date: ${printDate ? printDate.toLocaleDateString() : 'N/A'}`, 14, 36);
+    doc.text(`Time: ${currentTime || 'N/A'}`, 14, 42);
+
+    // Prepare table data
+    const tableColumn = ["Product", "Qty", "Unit Price", "Total"];
+    const tableRows: string[][] = [];
+
+    items.forEach(item => {
+        tableRows.push([
+            item.name,
+            item.quantity.toString(),
+            `₹${item.price.toFixed(2)}`,
+            `₹${(item.price * item.quantity).toFixed(2)}`
+        ]);
+    });
+
+    // Add table to the PDF
+    (doc as any).autoTable({
+        head: [tableColumn],
+        body: tableRows,
+        startY: 50,
+        didDrawPage: (data: any) => { // Function to add total amount at the end of the table
+            doc.setFontSize(14);
+            const totalAmtText = `Total Amount: ₹${totalAmount.toFixed(2)}`;
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const textWidth = doc.getTextWidth(totalAmtText);
+            const x = pageWidth - textWidth - 14;
+            doc.text(totalAmtText, x, data.table.finalY + 15);
+        }
+    });
+
+    // Convert to base64
+    const pdfDataUri = doc.output('datauristring');
+    return pdfDataUri;
+};
+
+  const handleWhatsAppShare = async () => {
+    try {
+      const pdfDataUri = await generatePdf();
+      //const encodedPdf = encodeURIComponent(pdfDataUri);  // No need to encode the entire data URI
+      // The message needs to include the PDF data URI
+      const whatsappUrl = `https://wa.me/?text=Here's your bill! Click to view: ${pdfDataUri}`;
+      window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      console.error("Error generating or sharing PDF:", error);
+      alert("Failed to generate or share PDF. Please try again.");
+    }
+  };
 
   const handlePrint = () => {
     const content = billContentRef.current;
@@ -253,4 +285,3 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
     </Dialog>
   );
 }
-
