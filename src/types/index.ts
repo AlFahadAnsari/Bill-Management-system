@@ -3,6 +3,8 @@ export interface Product {
   name: string;
   category: string;
   price: number;
+  createdAt?: Date; // Optional, Prisma adds these
+  updatedAt?: Date; // Optional, Prisma adds these
 }
 
 export interface BillItem extends Product {

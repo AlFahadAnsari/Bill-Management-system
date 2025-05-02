@@ -1,3 +1,4 @@
+// src/components/product-management/product-form.tsx
 "use client"
 
 import type * as React from 'react';
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import type { Product } from "@/types"
+import { DialogClose } from '@/components/ui/dialog'; // Import DialogClose for Cancel
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -34,9 +36,16 @@ interface ProductFormProps {
   initialData?: Product | null;
   buttonText?: string;
   isSubmitting?: boolean;
+  onCancel?: () => void; // Add onCancel prop
 }
 
-export function ProductForm({ onSubmit, initialData, buttonText = "Save Product", isSubmitting = false }: ProductFormProps) {
+export function ProductForm({
+  onSubmit,
+  initialData,
+  buttonText = "Save Product",
+  isSubmitting = false,
+  onCancel // Destructure onCancel
+}: ProductFormProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -46,12 +55,23 @@ export function ProductForm({ onSubmit, initialData, buttonText = "Save Product"
     },
   })
 
+   // Reset form if initialData changes (e.g., when switching from add to edit in some scenarios)
+   React.useEffect(() => {
+    if (initialData) {
+      form.reset({
+        name: initialData.name,
+        category: initialData.category,
+        price: initialData.price,
+      });
+    } else {
+        form.reset({ name: "", category: "", price: 0 }); // Reset for add mode
+    }
+   }, [initialData, form]); // form added to dependency array
+
+
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     await onSubmit(values);
-    // Optionally reset the form after successful submission
-    // if (!initialData) {
-    //   form.reset();
-    // }
+    // Form reset is handled by useEffect or Dialog close now
   }
 
   return (
@@ -90,15 +110,24 @@ export function ProductForm({ onSubmit, initialData, buttonText = "Save Product"
             <FormItem>
               <FormLabel>Price ($)</FormLabel>
               <FormControl>
-                <Input type="number" step="0.01" placeholder="e.g., 19.99" {...field} />
+                <Input type="number" step="0.01" min="0" placeholder="e.g., 19.99" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : buttonText}
-        </Button>
+        <div className="flex justify-end space-x-2 pt-4">
+           {/* Cancel Button */}
+           <DialogClose asChild>
+             <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
+               Cancel
+             </Button>
+           </DialogClose>
+           {/* Submit Button */}
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Saving...' : buttonText}
+          </Button>
+        </div>
       </form>
     </Form>
   )
