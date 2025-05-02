@@ -39,30 +39,26 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
 
   React.useEffect(() => {
     if (isOpen) {
-      setPrintDate(new Date()); // Set print date when dialog opens
-    }
-  }, [isOpen]);
-
-  React.useEffect(() => {
-    if (isOpen) {
-      // Get current time only on client side
-      setCurrentTime(new Date().toLocaleTimeString());
+      // Set date and time only on the client-side after hydration
+      const now = new Date();
+      setPrintDate(now);
+      setCurrentTime(now.toLocaleTimeString());
     }
   }, [isOpen]);
 
 
  const getBillTextForShare = (): string => {
-     let billText = `*Invoice / Bill*\n`;
+     let billText = `*Invoice / Bill*\n\n`;
      billText += `*Client:* ${clientName}\n`;
      billText += `*Date:* ${printDate ? printDate.toLocaleDateString() : 'N/A'}\n`;
      billText += `*Time:* ${currentTime || 'N/A'}\n\n`;
      billText += `*Items:*\n`;
      billText += `--------------------\n`;
      items.forEach(item => {
-         billText += `${item.name} (Qty: ${item.quantity}) - $${(item.price * item.quantity).toFixed(2)}\n`;
+         billText += `${item.name} (Qty: ${item.quantity}) - ₹${(item.price * item.quantity).toFixed(2)}\n`; // Changed $ to ₹
      });
      billText += `--------------------\n`;
-     billText += `*Total Amount:* $${totalAmount.toFixed(2)}\n\n`;
+     billText += `*Total Amount:* ₹${totalAmount.toFixed(2)}\n\n`; // Changed $ to ₹
      billText += `Thank you!`;
      return billText;
   };
@@ -183,8 +179,8 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
                   <tr key={item.id} className="border-b">
                     <td className="py-1">{item.name}</td>
                     <td className="text-center py-1">{item.quantity}</td>
-                    <td className="text-right py-1">${item.price.toFixed(2)}</td>
-                    <td className="text-right py-1">${(item.price * item.quantity).toFixed(2)}</td>
+                    <td className="text-right py-1">₹{item.price.toFixed(2)}</td> {/* Changed $ to ₹ */}
+                    <td className="text-right py-1">₹{(item.price * item.quantity).toFixed(2)}</td> {/* Changed $ to ₹ */}
                   </tr>
                 ))}
               </tbody>
@@ -193,7 +189,7 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
             <Separator className="my-4" />
 
             <div className="text-right total-section">
-              <p><strong>Total Amount: ${totalAmount.toFixed(2)}</strong></p>
+              <p><strong>Total Amount: ₹{totalAmount.toFixed(2)}</strong></p> {/* Changed $ to ₹ */}
             </div>
           </div>
         </ScrollArea>
@@ -216,4 +212,3 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
     </Dialog>
   );
 }
-

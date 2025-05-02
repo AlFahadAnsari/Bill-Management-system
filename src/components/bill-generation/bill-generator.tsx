@@ -40,7 +40,7 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
       if (!grouped[p.category]) {
         grouped[p.category] = [];
       }
-      grouped[p.category].push({ value: p.id, label: `${p.name} ($${p.price.toFixed(2)})`, group: p.category });
+      grouped[p.category].push({ value: p.id, label: `${p.name} (₹${p.price.toFixed(2)})`, group: p.category }); // Changed $ to ₹
     });
 
     // Flatten grouped options while keeping the group structure for the Combobox
@@ -192,7 +192,7 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
                  <TableFooter>
                    <TableRow className="bg-muted/50 font-semibold">
                      <TableCell colSpan={4} className="text-right">Total Amount:</TableCell>
-                     <TableCell className="text-right">${totalAmount.toFixed(2)}</TableCell>
+                     <TableCell className="text-right">₹{totalAmount.toFixed(2)}</TableCell> {/* Changed $ to ₹ */}
                      <TableCell></TableCell> {/* Empty cell for remove column */}
                    </TableRow>
                  </TableFooter>

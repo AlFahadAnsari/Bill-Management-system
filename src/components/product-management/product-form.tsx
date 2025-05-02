@@ -1,7 +1,7 @@
 // src/components/product-management/product-form.tsx
 "use client"
 
-import type * as React from 'react';
+import * as React from 'react';
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
@@ -16,6 +16,13 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select" // Import Select components
 import type { Product } from "@/types"
 import { DialogClose } from '@/components/ui/dialog'; // Import DialogClose for Cancel
 
@@ -30,6 +37,18 @@ const formSchema = z.object({
     message: "Price must be a positive number.",
   }),
 })
+
+// Define sample categories
+const productCategories = [
+  "Electronics",
+  "Clothing",
+  "Groceries",
+  "Books",
+  "Home Goods",
+  "Toys",
+  "Beauty",
+  "Other", // Add an 'Other' option
+];
 
 interface ProductFormProps {
   onSubmit: (values: z.infer<typeof formSchema>) => void | Promise<void>;
@@ -84,7 +103,7 @@ export function ProductForm({
             <FormItem>
               <FormLabel>Product Name</FormLabel>
               <FormControl>
-                <Input placeholder="e.g., T-Shirt" {...field} />
+                <Input placeholder="e.g., Laptop" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -96,9 +115,20 @@ export function ProductForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Category</FormLabel>
-              <FormControl>
-                <Input placeholder="e.g., Clothing" {...field} />
-              </FormControl>
+              <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a category" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {productCategories.map((category) => (
+                    <SelectItem key={category} value={category}>
+                      {category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <FormMessage />
             </FormItem>
           )}
@@ -108,9 +138,9 @@ export function ProductForm({
           name="price"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Price ($)</FormLabel>
+              <FormLabel>Price (₹)</FormLabel> {/* Changed $ to ₹ */}
               <FormControl>
-                <Input type="number" step="0.01" min="0" placeholder="e.g., 19.99" {...field} />
+                <Input type="number" step="0.01" min="0" placeholder="e.g., 49999.99" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
