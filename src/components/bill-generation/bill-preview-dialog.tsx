@@ -95,11 +95,11 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
       const pdfDataUri = doc.output('datauristring');
       return pdfDataUri;
 
-    } catch (error) {
+    } catch (error: any) {
        console.error("Error generating PDF:", error);
         toast({
           title: "PDF Generation Failed",
-          description: "Failed to generate PDF. Please try again.",
+          description: `Failed to generate PDF. Please try again. ${error.message}`,
           variant: "destructive",
         });
       return null;
