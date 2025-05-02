@@ -113,9 +113,8 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
          // generatePdf already shows a toast on failure, so we don't need another one here.
          return;
        }
-      //const encodedPdf = encodeURIComponent(pdfDataUri);  // No need to encode the entire data URI
-      // The message needs to include the PDF data URI
-      const whatsappUrl = `https://wa.me/?text=Here's your bill! Click to view: ${pdfDataUri}`;
+
+      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent("Here's your bill! Click to view:")} ${encodeURIComponent(pdfDataUri)}`;
       window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
     } catch (error) {
       console.error("Error generating or sharing PDF:", error);
@@ -306,5 +305,3 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
     </Dialog>
   );
 }
-
-
