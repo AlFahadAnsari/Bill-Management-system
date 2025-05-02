@@ -66,8 +66,7 @@ export function ProductForm({
 }: ProductFormProps) {
   const [categories, setCategories] = React.useState<ComboboxOption[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = React.useState(true);
-  const [showNewCategoryInput, setShowNewCategoryInput] = React.useState(false);
-  // Removed selectedCategory state - will rely on form state
+  // Removed showNewCategoryInput state - will derive from form value
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -108,24 +107,27 @@ export function ProductForm({
         description: initialData.description || "",
         newCategory: "", // Reset new category input
       });
-      // Hide new category input if editing an existing product
-      setShowNewCategoryInput(false);
     } else {
       // Reset form for adding a new product
       form.reset({ name: "", category: "", price: 0, description: "", newCategory: "" });
-      setShowNewCategoryInput(false);
     }
-  }, [initialData, form.reset]); // Depend on form.reset to avoid potential issues
+  }, [initialData, form.reset]); // Depend on form.reset
 
-   // Watch the category field to show/hide the new category input
+   // Watch the category field to derive state
    const watchedCategory = form.watch('category');
+   const showNewCategoryInput = watchedCategory === 'Add New Category';
+
+   // Effect to clear newCategory field if category changes *away* from 'Add New Category'
    React.useEffect(() => {
-       setShowNewCategoryInput(watchedCategory === 'Add New Category');
-       // Clear the new category input if a different category is selected
-       if (watchedCategory !== 'Add New Category') {
-         form.setValue('newCategory', '');
+     if (watchedCategory !== 'Add New Category') {
+       // Check if the field actually has a value before clearing
+       if (form.getValues('newCategory')) {
+         form.setValue('newCategory', '', { shouldValidate: true }); // Clear and trigger validation
        }
-   }, [watchedCategory, form.setValue]);
+     }
+     // Only depends on watchedCategory and form actions
+   }, [watchedCategory, form.setValue, form.getValues]);
+
 
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
       let finalCategory = values.category;
@@ -139,7 +141,7 @@ export function ProductForm({
          console.log("Adding new category:", finalCategory);
          // Add the new category to the state optimistically
          // The backend action should handle the actual creation if needed
-         setCategories(prev => [...prev, { label: finalCategory, value: finalCategory }]);
+         setCategories(prev => [...prev, { label: finalCategory, value: finalCategory }].sort((a,b)=> a.label.localeCompare(b.label)));
       }
 
       // Prepare data for submission, excluding the temporary newCategory field
@@ -173,13 +175,10 @@ export function ProductForm({
           control={form.control}
           name="category"
           render={({ field }) => {
-             // Dynamically add 'Add New Category' option if not already showing the input
+             // Dynamically add 'Add New Category' option if it doesn't exist as a real category
              const categoryOptions = [...categories];
-             if (!showNewCategoryInput) {
-               // Ensure it's not added if it somehow already exists as a real category
-               if (!categories.some(c => c.value === 'Add New Category')) {
-                   categoryOptions.push({ label: 'Add New Category', value: 'Add New Category' });
-               }
+             if (!categories.some(c => c.value === 'Add New Category')) {
+                 categoryOptions.push({ label: 'Add New Category', value: 'Add New Category' });
              }
 
             return (
@@ -203,7 +202,7 @@ export function ProductForm({
           }}
         />
 
-        {/* Conditionally render new category input */}
+        {/* Conditionally render new category input based on derived value */}
         {showNewCategoryInput && (
            <FormField
              control={form.control}
@@ -216,7 +215,7 @@ export function ProductForm({
                      placeholder="Enter new category name"
                      {...field}
                      disabled={isSubmitting}
-                     // autoFocus // Optionally focus when it appears
+                     autoFocus // Optionally focus when it appears
                    />
                  </FormControl>
                  {/* Display validation error specifically for newCategory */}
@@ -276,5 +275,3 @@ export function ProductForm({
     </Form>
   )
 }
-
-    
