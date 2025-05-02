@@ -45,7 +45,8 @@ export async function addProduct(data: z.infer<typeof AddProductSchema>): Promis
     await prisma.product.create({
       data: validation.data,
     });
-    revalidatePath('/'); // Revalidate the page to show the new product
+    revalidatePath('/admin'); // Revalidate the admin page
+    revalidatePath('/'); // Also revalidate the home page if needed
     return { success: true };
   } catch (error) {
     console.error('Failed to add product:', error);
@@ -68,7 +69,8 @@ export async function updateProduct(data: z.infer<typeof UpdateProductSchema>): 
          price: validation.data.price,
        },
     });
-    revalidatePath('/'); // Revalidate the page to show the updated product
+    revalidatePath('/admin'); // Revalidate the admin page
+    revalidatePath('/'); // Also revalidate the home page if needed
     return { success: true };
   } catch (error) {
     console.error('Failed to update product:', error);
@@ -84,7 +86,8 @@ export async function deleteProduct(productId: string): Promise<{ success: boole
     await prisma.product.delete({
       where: { id: productId },
     });
-    revalidatePath('/'); // Revalidate the page to remove the deleted product
+    revalidatePath('/admin'); // Revalidate the admin page
+    revalidatePath('/'); // Also revalidate the home page if needed
     return { success: true };
   } catch (error) {
     console.error('Failed to delete product:', error);
