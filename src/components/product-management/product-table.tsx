@@ -145,3 +145,4 @@ export function ProductTable({ products, onDelete, onUpdate }: ProductTableProps
     </>
   )
 }
+
