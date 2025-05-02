@@ -53,57 +53,68 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
 
   const generatePdf = async () => {
     const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
 
     // Add title and client information
     doc.setFontSize(18);
-    doc.text('Bill / Invoice', 14, 20);
-
-    doc.setFontSize(12);
-    doc.text(`Client: ${clientName}`, 14, 30);
-    doc.text(`Date: ${printDate ? printDate.toLocaleDateString() : 'N/A'}`, 14, 36);
-    doc.text(`Time: ${currentTime || 'N/A'}`, 14, 42);
-
-    // Prepare table data
-    const tableColumn = ["Product", "Qty", "Unit Price", "Total"];
-    const tableRows: string[][] = [];
-
-    items.forEach(item => {
-        tableRows.push([
-            item.name,
-            item.quantity.toString(),
-            `₹${item.price.toFixed(2)}`,
-            `₹${(item.price * item.quantity).toFixed(2)}`
-        ]);
-    });
-
-    // Add table to the PDF
     try {
-      (doc as any).autoTable({
-          head: [tableColumn],
-          body: tableRows,
-          startY: 50,
-          didDrawPage: (data: any) => { // Function to add total amount at the end of the table
-              doc.setFontSize(14);
-              const totalAmtText = `Total Amount: ₹${totalAmount.toFixed(2)}`;
-              const pageWidth = doc.internal.pageSize.getWidth();
-              const textWidth = doc.getTextWidth(totalAmtText);
-              const x = pageWidth - textWidth - 14;
-              doc.text(totalAmtText, x, data.table.finalY + 15);
-          }
-      });
-      // Convert to base64
-      const pdfDataUri = doc.output('datauristring');
-      return pdfDataUri;
+      doc.text('Bill / Invoice', 14, 20);
 
-    } catch (error: any) {
-       console.error("Error generating PDF:", error);
-        toast({
-          title: "PDF Generation Failed",
-          description: `Failed to generate PDF. Please try again. ${error.message}`,
-          variant: "destructive",
+      doc.setFontSize(12);
+      doc.text(`Client: ${clientName}`, 14, 30);
+      doc.text(`Date: ${printDate ? printDate.toLocaleDateString() : 'N/A'}`, 14, 36);
+      doc.text(`Time: ${currentTime || 'N/A'}`, 14, 42);
+
+      // Prepare table data
+      const tableColumn = ["Product", "Qty", "Unit Price", "Total"];
+      const tableRows: string[][] = [];
+
+      items.forEach(item => {
+          tableRows.push([
+              item.name,
+              item.quantity.toString(),
+              `₹${item.price.toFixed(2)}`,
+              `₹${(item.price * item.quantity).toFixed(2)}`
+          ]);
+      });
+
+      // Add table to the PDF
+      try {
+        (doc as any).autoTable({
+            head: [tableColumn],
+            body: tableRows,
+            startY: 50,
+            didDrawPage: (data: any) => { // Function to add total amount at the end of the table
+                doc.setFontSize(14);
+                const totalAmtText = `Total Amount: ₹${totalAmount.toFixed(2)}`;
+                const textWidth = doc.getTextWidth(totalAmtText);
+                const x = pageWidth - textWidth - 14;
+                doc.text(totalAmtText, x, data.table.finalY + 15);
+            }
         });
-      return null;
-    }
+        // Convert to base64
+        const pdfDataUri = doc.output('datauristring');
+        return pdfDataUri;
+
+      } catch (tableError: any) {
+         console.error("Error generating PDF table:", tableError);
+          toast({
+            title: "PDF Generation Failed",
+            description: `Failed to generate PDF table. Please try again. ${tableError.message}`,
+            variant: "destructive",
+          });
+        return null;
+      }
+  } catch (error: any) {
+     console.error("Error generating PDF text:", error);
+      toast({
+        title: "PDF Generation Failed",
+        description: `Failed to generate PDF text. Please try again. ${error.message}`,
+        variant: "destructive",
+      });
+    return null;
+  }
 };
 
   const handleWhatsAppShare = async () => {
@@ -305,3 +316,4 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
     </Dialog>
   );
 }
+
