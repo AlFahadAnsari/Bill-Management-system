@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -57,8 +56,10 @@ export function Combobox({
 
   React.useEffect(() => {
     // Sync input value if the external value changes
-    setInputValue(value || "");
-  }, [value]);
+    if (value !== inputValue) {
+        setInputValue(value || "");
+    }
+  }, [value, inputValue]);
 
 
   const groupedOptions = React.useMemo(() => {
@@ -160,3 +161,4 @@ export function Combobox({
     </Popover>
   )
 }
+
