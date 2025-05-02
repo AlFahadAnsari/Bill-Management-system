@@ -5,6 +5,7 @@ export interface Product {
   price: number;
   createdAt?: Date; // Optional, Prisma adds these
   updatedAt?: Date; // Optional, Prisma adds these
+  description?: string;
 }
 
 export interface BillItem extends Product {

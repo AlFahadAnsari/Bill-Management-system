@@ -21,6 +21,7 @@ import { Combobox, type ComboboxOption } from "@/components/ui/combobox" // Impo
 import type { Product } from "@/types"
 import { DialogClose } from '@/components/ui/dialog'; // Import DialogClose for Cancel
 import { getCategories } from '@/actions/category-actions'; // Import category action
+import { Textarea } from '@/components/ui/textarea';
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -29,9 +30,11 @@ const formSchema = z.object({
   category: z.string().min(1, {
     message: "Category is required.", // Can be existing or new
   }),
+  newCategory: z.string().optional(), // Optional field for new category name
   price: z.coerce.number().positive({
     message: "Price must be a positive number.",
   }),
+  description: z.string().optional(),
 })
 
 // Removed hardcoded productCategories
@@ -53,6 +56,7 @@ export function ProductForm({
 }: ProductFormProps) {
   const [categories, setCategories] = React.useState<ComboboxOption[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = React.useState(true);
+  const [showNewCategoryInput, setShowNewCategoryInput] = React.useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -60,6 +64,8 @@ export function ProductForm({
       name: initialData?.name || "",
       category: initialData?.category || "",
       price: initialData?.price || 0,
+      description: initialData?.description || "",
+      newCategory: "",
     },
   })
 
@@ -88,24 +94,38 @@ export function ProductForm({
         name: initialData.name,
         category: initialData.category,
         price: initialData.price,
+        description: initialData.description || "",
+        newCategory: "", // Reset new category input
       });
+      setShowNewCategoryInput(false); // Hide new category input if editing
     } else {
-      form.reset({ name: "", category: "", price: 0 }); // Reset for add mode
+      form.reset({ name: "", category: "", price: 0, description: "", newCategory: "" }); // Reset for add mode
+      setShowNewCategoryInput(false);
     }
   }, [initialData, form]);
 
 
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
-    // If the category entered is not in the fetched list, it's a new category
-    const isNewCategory = !categories.some(cat => cat.value === values.category);
-    if (isNewCategory && values.category.trim()) {
+      // If the category entered is "Add New Category", use the newCategory value
+      let categoryValue = values.category;
+      if (values.category === 'Add New Category') {
+          if (!values.newCategory || values.newCategory.trim() === '') {
+              // Handle error: new category name is required
+              form.setError('newCategory', { type: 'required', message: 'New category name is required.' });
+              return;
+          }
+          categoryValue = values.newCategory.trim();
+      }
+
+    const isNewCategory = !categories.some(cat => cat.value === categoryValue);
+    if (isNewCategory && categoryValue.trim()) {
        // Optionally: You could add logic here to explicitly confirm adding a new category
-       console.log("Adding new category:", values.category);
+       console.log("Adding new category:", categoryValue);
        // Add the new category to the state so it appears immediately if needed,
        // although getCategories will fetch it next time anyway.
-       setCategories(prev => [...prev, { label: values.category, value: values.category }]);
+       setCategories(prev => [...prev, { label: categoryValue, value: categoryValue }]);
     }
-    await onSubmit(values);
+    await onSubmit({...values, category: categoryValue});
   }
 
   return (
@@ -127,30 +147,59 @@ export function ProductForm({
         <FormField
           control={form.control}
           name="category"
-          render={({ field }) => (
-            <FormItem className="flex flex-col"> {/* Ensure proper layout for Combobox */}
-              <FormLabel>Category</FormLabel>
-              <Combobox
-                 options={categories}
-                 value={field.value}
-                 onChange={(value) => {
-                    // Allow selecting or typing a new category
-                    field.onChange(value);
-                 }}
-                 placeholder="Select or type category..."
-                 searchPlaceholder="Search or add category..."
-                 emptyPlaceholder={isLoadingCategories ? "Loading categories..." : "No categories found. Type to add."}
-                 disabled={isSubmitting || isLoadingCategories}
-                 // Allow creating new entries implicitly by typing
-                 // Note: The Combobox provided doesn't explicitly have a 'create' prop,
-                 // it relies on the onChange handler and form submission logic.
-                 // We update the field value directly.
-               />
-               {isLoadingCategories && <Loader2 className="h-4 w-4 animate-spin mt-1" />}
-              <FormMessage />
-            </FormItem>
-          )}
+          render={({ field }) => {
+            const categoryOptions = [...categories];
+            if (!showNewCategoryInput) {
+              categoryOptions.push({ label: 'Add New Category', value: 'Add New Category' });
+            }
+            return (
+              <FormItem className="flex flex-col"> {/* Ensure proper layout for Combobox */}
+                <FormLabel>Category</FormLabel>
+                <Combobox
+                   options={categoryOptions}
+                   value={field.value}
+                   onChange={(value) => {
+                      // Allow selecting or typing a new category
+                      field.onChange(value);
+                      setShowNewCategoryInput(value === 'Add New Category');
+                   }}
+                   placeholder="Select or type category..."
+                   searchPlaceholder="Search or add category..."
+                   emptyPlaceholder={isLoadingCategories ? "Loading categories..." : "No categories found. Type to add."}
+                   disabled={isSubmitting || isLoadingCategories}
+                   // Allow creating new entries implicitly by typing
+                   // Note: The Combobox provided doesn't explicitly have a 'create' prop,
+                   // it relies on the onChange handler and form submission logic.
+                   // We update the field value directly.
+                 />
+                 {isLoadingCategories && <Loader2 className="h-4 w-4 animate-spin mt-1" />}
+                <FormMessage />
+              </FormItem>
+            );
+          }}
         />
+
+        {/* Conditionally render new category input */}
+        {showNewCategoryInput && (
+           <FormField
+             control={form.control}
+             name="newCategory"
+             render={({ field }) => (
+               <FormItem>
+                 <FormLabel>New Category Name</FormLabel>
+                 <FormControl>
+                   <Input
+                     placeholder="Enter new category name"
+                     {...field}
+                     disabled={isSubmitting}
+                   />
+                 </FormControl>
+                 <FormMessage />
+               </FormItem>
+             )}
+           />
+         )}
+
         <FormField
           control={form.control}
           name="price"
@@ -164,6 +213,19 @@ export function ProductForm({
             </FormItem>
           )}
         />
+          <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                  <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                          <Textarea placeholder="Enter product description" {...field} disabled={isSubmitting} />
+                      </FormControl>
+                      <FormMessage />
+                  </FormItem>
+              )}
+          />
         <div className="flex justify-end space-x-2 pt-4">
           {/* Cancel Button */}
           <DialogClose asChild>
@@ -186,4 +248,3 @@ export function ProductForm({
     </Form>
   )
 }
-

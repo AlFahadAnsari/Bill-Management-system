@@ -11,6 +11,7 @@ const AddProductSchema = z.object({
   name: z.string().min(2, { message: 'Product name must be at least 2 characters.' }),
   category: z.string().min(1, { message: 'Category is required.' }),
   price: z.coerce.number().positive({ message: 'Price must be a positive number.' }),
+  description: z.string().optional(),
 });
 
 // Schema for updating an existing product (id is required)
@@ -67,6 +68,7 @@ export async function updateProduct(data: z.infer<typeof UpdateProductSchema>): 
          name: validation.data.name,
          category: validation.data.category,
          price: validation.data.price,
+         description: validation.data.description,
        },
     });
     revalidatePath('/admin'); // Revalidate the admin page
