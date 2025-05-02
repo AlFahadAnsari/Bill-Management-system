@@ -57,6 +57,9 @@ export function ProductForm({
   const [categories, setCategories] = React.useState<ComboboxOption[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = React.useState(true);
   const [showNewCategoryInput, setShowNewCategoryInput] = React.useState(false);
+  // Added state to store the currently selected category
+  const [selectedCategory, setSelectedCategory] = React.useState(initialData?.category || "");
+
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -98,9 +101,11 @@ export function ProductForm({
         newCategory: "", // Reset new category input
       });
       setShowNewCategoryInput(false); // Hide new category input if editing
+      setSelectedCategory(initialData.category);
     } else {
       form.reset({ name: "", category: "", price: 0, description: "", newCategory: "" }); // Reset for add mode
       setShowNewCategoryInput(false);
+      setSelectedCategory("");
     }
   }, [initialData, form]);
 
@@ -157,10 +162,11 @@ export function ProductForm({
                 <FormLabel>Category</FormLabel>
                 <Combobox
                    options={categoryOptions}
-                   value={field.value}
+                   value={selectedCategory}
                    onChange={(value) => {
                       // Allow selecting or typing a new category
-                      field.onChange(value);
+                      setSelectedCategory(value);
+                      form.setValue('category', value);
                       setShowNewCategoryInput(value === 'Add New Category');
                    }}
                    placeholder="Select or type category..."
