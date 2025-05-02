@@ -1,3 +1,4 @@
+
 "use client";
 
 import type * as React from 'react';
@@ -42,7 +43,7 @@ export function BillItemRow({ item, onQuantityChange, onRemove }: BillItemRowPro
     <TableRow>
       <TableCell className="font-medium">{item.name}</TableCell>
       <TableCell>{item.category}</TableCell>
-      <TableCell className="text-right">₹{item.price.toFixed(2)}</TableCell> {/* Changed $ to ₹ */}
+      <TableCell className="text-right">₹{item.price.toFixed(2)}</TableCell>
       <TableCell className="text-center">
         <div className="flex items-center justify-center space-x-1">
           <Button
@@ -74,7 +75,7 @@ export function BillItemRow({ item, onQuantityChange, onRemove }: BillItemRowPro
           </Button>
         </div>
       </TableCell>
-      <TableCell className="text-right">₹{itemTotal}</TableCell> {/* Changed $ to ₹ */}
+      <TableCell className="text-right">₹{itemTotal}</TableCell>
       <TableCell className="text-right">
         <Button variant="ghost" size="icon" onClick={() => onRemove(item.id)}>
           <Trash2 className="h-4 w-4 text-destructive" />

@@ -1,7 +1,8 @@
+
 "use client";
 
 import * as React from 'react';
-import { Printer, X } from 'lucide-react'; // Removed Share icon if not used directly
+import { Printer, X } from 'lucide-react';
 
 import type { BillItem } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -27,7 +28,7 @@ const WhatsAppIcon = () => (
 interface BillPreviewDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  clientName: string; // Added clientName prop
+  clientName: string;
   items: BillItem[];
   totalAmount: number;
 }
@@ -39,7 +40,6 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
 
   React.useEffect(() => {
     if (isOpen) {
-      // Set date and time only on the client-side after hydration
       const now = new Date();
       setPrintDate(now);
       setCurrentTime(now.toLocaleTimeString());
@@ -55,18 +55,20 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
      billText += `*Items:*\n`;
      billText += `--------------------\n`;
      items.forEach(item => {
-         billText += `${item.name} (Qty: ${item.quantity}) - ₹${(item.price * item.quantity).toFixed(2)}\n`; // Changed $ to ₹
+         billText += `${item.name} (Qty: ${item.quantity}) - ₹${(item.price * item.quantity).toFixed(2)}\n`;
      });
      billText += `--------------------\n`;
-     billText += `*Total Amount:* ₹${totalAmount.toFixed(2)}\n\n`; // Changed $ to ₹
+     billText += `*Total Amount:* ₹${totalAmount.toFixed(2)}\n\n`;
      billText += `Thank you!`;
      return billText;
   };
 
   const handleWhatsAppShare = () => {
+     // Note: Sharing a generated PDF directly via a wa.me link is not directly supported by WhatsApp Web/Mobile APIs from the client-side.
+     // This implementation shares the bill details as formatted text.
+     // For PDF sharing, a backend service would typically be needed to generate and host the PDF, then share its link.
      const billText = getBillTextForShare();
      const encodedText = encodeURIComponent(billText);
-     // Using wa.me link (more universal)
      const whatsappUrl = `https://wa.me/?text=${encodedText}`;
      window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
   };
@@ -80,11 +82,15 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
          const styles = Array.from(document.styleSheets)
            .map(styleSheet => {
              try {
+               // Filter out cross-origin stylesheets
+               if (styleSheet.href && !styleSheet.href.startsWith(window.location.origin)) {
+                 return '';
+               }
                return Array.from(styleSheet.cssRules)
                  .map(rule => rule.cssText)
                  .join('');
              } catch (e) {
-               console.log('Access to stylesheet %s is denied. Ignoring.', styleSheet.href);
+               console.warn('Access to stylesheet %s is denied. Ignoring.', styleSheet.href);
                return '';
              }
            })
@@ -93,22 +99,29 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
         printWindow.document.write(`
           <html>
             <head>
-              <title>Bill Print</title>
+              <title>Bill Print - ${clientName}</title>
                <style>
-                 body { font-family: Arial, sans-serif; margin: 20px; }
+                 body { font-family: sans-serif; margin: 20px; }
                  .print-container { max-width: 800px; margin: auto; }
                  .header { text-align: center; margin-bottom: 20px; }
                  .header h1 { margin: 0; font-size: 1.5rem; }
                  .header p { margin: 5px 0; color: #555; font-size: 0.9rem;}
-                 .client-info { margin-bottom: 15px; font-size: 0.9rem; } /* Style for client info */
-                 .item-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-                 .item-table th, .item-table td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 0.9rem; }
-                 .item-table th { background-color: #f2f2f2; }
+                 .client-info { margin-bottom: 15px; font-size: 1rem; border-bottom: 1px solid #eee; padding-bottom: 10px;}
+                 .item-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.9rem;}
+                 .item-table th, .item-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                 .item-table th { background-color: #f2f2f2; font-weight: bold; }
                  .text-right { text-align: right !important; }
-                 .total-section { text-align: right; margin-top: 15px; font-size: 1rem; font-weight: bold; }
+                 .text-center { text-align: center !important; }
+                 .total-section { text-align: right; margin-top: 15px; font-size: 1.1rem; font-weight: bold; padding-top: 10px; border-top: 1px solid #eee;}
                  .footer { text-align: center; margin-top: 30px; font-size: 0.8rem; color: #777; }
-                 /* Minimal styles to somewhat resemble the dialog */
-                 ${styles} /* Include existing styles (may need refinement) */
+                 @media print {
+                   body { margin: 0; } /* Remove margin for printing */
+                   .print-container { max-width: none; }
+                   .no-print { display: none; } /* Class to hide elements in print */
+                   .item-table th, .item-table td { font-size: 10pt; padding: 6px; } /* Adjust print font size */
+                   .client-info, .total-section { font-size: 11pt; }
+                 }
+                 ${styles}
                </style>
             </head>
             <body>
@@ -117,7 +130,39 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
                    <h1>Invoice / Bill</h1>
                    <p>Date Generated: ${printDate ? printDate.toLocaleString() : 'N/A'}</p>
                  </div>
-                 ${content.innerHTML} {/* Content includes client name now */}
+                 <div ref="${billContentRef}" class="bill-content">
+                     {/* Client Info */}
+                     <div class="mb-4 client-info">
+                       <p><strong>Client:</strong> ${clientName}</p>
+                       <p><strong>Date:</strong> ${printDate ? printDate.toLocaleDateString() : 'N/A'}</p>
+                       <p><strong>Time:</strong> ${currentTime || 'N/A'}</p>
+                     </div>
+                     {/* Items Table - regenerated here for print structure */}
+                     <table class="w-full item-table">
+                      <thead>
+                        <tr>
+                          <th class="text-left pb-2">Product</th>
+                          <th class="text-center pb-2">Qty</th>
+                          <th class="text-right pb-2">Unit Price</th>
+                          <th class="text-right pb-2">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${items.map((item) => `
+                          <tr key="${item.id}" class="border-b">
+                            <td class="py-1">${item.name}</td>
+                            <td class="text-center py-1">${item.quantity}</td>
+                            <td class="text-right py-1">₹${item.price.toFixed(2)}</td>
+                            <td class="text-right py-1">₹${(item.price * item.quantity).toFixed(2)}</td>
+                          </tr>
+                        `).join('')}
+                      </tbody>
+                    </table>
+                    {/* Total Amount */}
+                    <div class="text-right total-section">
+                       <p><strong>Total Amount: ₹${totalAmount.toFixed(2)}</strong></p>
+                    </div>
+                 </div>
                  <div class="footer">Thank you!</div>
               </div>
             </body>
@@ -142,7 +187,7 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
         <DialogHeader>
           <DialogTitle>Bill Preview</DialogTitle>
           <DialogClose asChild>
-             <Button variant="ghost" size="icon" className="absolute right-4 top-4" onClick={onClose}>
+             <Button variant="ghost" size="icon" className="absolute right-4 top-4 no-print" onClick={onClose}>
                 <X className="h-4 w-4" />
                 <span className="sr-only">Close</span>
              </Button>
@@ -150,13 +195,9 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
         </DialogHeader>
 
         <ScrollArea className="max-h-[60vh] pr-6">
+           {/* This div is now mainly for screen display, print uses reconstructed HTML */}
           <div ref={billContentRef} className="text-sm p-1">
-             {/* Optional: Add Store Name/Logo */}
-             {/* <div className="text-center mb-4">
-               <h2 className="text-xl font-semibold">Your Store Name</h2>
-               <p className="text-xs text-muted-foreground">123 Main St, Anytown</p>
-             </div> */}
-              <div className="mb-4 client-info"> {/* Added client-info class */}
+              <div className="mb-4 client-info">
                  <p><strong>Client:</strong> {clientName}</p>
                  <p><strong>Date:</strong> {printDate ? printDate.toLocaleDateString() : 'N/A'}</p>
                  <p><strong>Time:</strong> {currentTime || 'N/A'}</p>
@@ -179,8 +220,8 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
                   <tr key={item.id} className="border-b">
                     <td className="py-1">{item.name}</td>
                     <td className="text-center py-1">{item.quantity}</td>
-                    <td className="text-right py-1">₹{item.price.toFixed(2)}</td> {/* Changed $ to ₹ */}
-                    <td className="text-right py-1">₹{(item.price * item.quantity).toFixed(2)}</td> {/* Changed $ to ₹ */}
+                    <td className="text-right py-1">₹{item.price.toFixed(2)}</td>
+                    <td className="text-right py-1">₹{(item.price * item.quantity).toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -189,14 +230,14 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
             <Separator className="my-4" />
 
             <div className="text-right total-section">
-              <p><strong>Total Amount: ₹{totalAmount.toFixed(2)}</strong></p> {/* Changed $ to ₹ */}
+              <p><strong>Total Amount: ₹{totalAmount.toFixed(2)}</strong></p>
             </div>
           </div>
         </ScrollArea>
 
-        <DialogFooter className="mt-4 sm:justify-between items-center">
+        <DialogFooter className="mt-4 sm:justify-between items-center no-print">
            <Button variant="outline" onClick={handleWhatsAppShare} className="w-full sm:w-auto mb-2 sm:mb-0 bg-green-500 hover:bg-green-600 text-white">
-              <WhatsAppIcon /> {/* Use SVG icon */}
+              <WhatsAppIcon />
               Share on WhatsApp
            </Button>
            <div className="flex gap-2 w-full sm:w-auto justify-end">
@@ -212,3 +253,4 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
     </Dialog>
   );
 }
+
