@@ -58,7 +58,7 @@ export function BillItemRow({ item, onQuantityChange, onRemove }: BillItemRowPro
           <Input
             type="number"
             min="0"
-            value={item.quantity === 0 && document.activeElement !== event?.target ? '' : item.quantity} // Show empty if 0 and not focused
+            value={item.quantity === 0 && document.activeElement !== e?.target ? '' : item.quantity} // Show empty if 0 and not focused
             onChange={handleQuantityChange}
             className="h-8 w-16 text-center px-1"
             aria-label={`Quantity for ${item.name}`}
@@ -84,3 +84,4 @@ export function BillItemRow({ item, onQuantityChange, onRemove }: BillItemRowPro
     </TableRow>
   );
 }
+
