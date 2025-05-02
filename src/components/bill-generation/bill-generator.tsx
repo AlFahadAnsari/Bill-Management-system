@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -224,13 +223,13 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
                  )}
                </TableBody>
                 {billItems.length > 0 && (
-                 <TableFooter>
+                 
                    <TableRow className="bg-muted/50 font-semibold">
                      <TableCell colSpan={4} className="text-right">Total Amount:</TableCell>
                      <TableCell className="text-right font-bold text-lg">₹{totalAmount.toFixed(2)}</TableCell>
-                     <TableCell></TableCell> {/* Empty cell for remove column */}
+                     <TableCell></TableCell>{/* Empty cell for remove column */}
                    </TableRow>
-                 </TableFooter>
+                 
                  )}
              </Table>
           </div>
@@ -257,3 +256,4 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
     </>
   )
 }
+

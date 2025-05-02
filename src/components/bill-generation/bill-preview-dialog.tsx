@@ -17,6 +17,7 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useToast } from "@/hooks/use-toast"; // Import useToast
 
 // Inline SVG for WhatsApp icon
 const WhatsAppIcon = () => (
@@ -38,6 +39,7 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
   const billContentRef = React.useRef<HTMLDivElement>(null);
   const [printDate, setPrintDate] = React.useState<Date | null>(null);
   const [currentTime, setCurrentTime] = React.useState<string | null>(null);
+  const { toast } = useToast(); // Use the hook
 
   React.useEffect(() => {
     if (isOpen) {
@@ -74,35 +76,53 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
     });
 
     // Add table to the PDF
-    (doc as any).autoTable({
-        head: [tableColumn],
-        body: tableRows,
-        startY: 50,
-        didDrawPage: (data: any) => { // Function to add total amount at the end of the table
-            doc.setFontSize(14);
-            const totalAmtText = `Total Amount: ₹${totalAmount.toFixed(2)}`;
-            const pageWidth = doc.internal.pageSize.getWidth();
-            const textWidth = doc.getTextWidth(totalAmtText);
-            const x = pageWidth - textWidth - 14;
-            doc.text(totalAmtText, x, data.table.finalY + 15);
-        }
-    });
+    try {
+      (doc as any).autoTable({
+          head: [tableColumn],
+          body: tableRows,
+          startY: 50,
+          didDrawPage: (data: any) => { // Function to add total amount at the end of the table
+              doc.setFontSize(14);
+              const totalAmtText = `Total Amount: ₹${totalAmount.toFixed(2)}`;
+              const pageWidth = doc.internal.pageSize.getWidth();
+              const textWidth = doc.getTextWidth(totalAmtText);
+              const x = pageWidth - textWidth - 14;
+              doc.text(totalAmtText, x, data.table.finalY + 15);
+          }
+      });
+      // Convert to base64
+      const pdfDataUri = doc.output('datauristring');
+      return pdfDataUri;
 
-    // Convert to base64
-    const pdfDataUri = doc.output('datauristring');
-    return pdfDataUri;
+    } catch (error) {
+       console.error("Error generating PDF:", error);
+        toast({
+          title: "PDF Generation Failed",
+          description: "Failed to generate PDF. Please try again.",
+          variant: "destructive",
+        });
+      return null;
+    }
 };
 
   const handleWhatsAppShare = async () => {
     try {
       const pdfDataUri = await generatePdf();
+       if (!pdfDataUri) {
+         // generatePdf already shows a toast on failure, so we don't need another one here.
+         return;
+       }
       //const encodedPdf = encodeURIComponent(pdfDataUri);  // No need to encode the entire data URI
       // The message needs to include the PDF data URI
       const whatsappUrl = `https://wa.me/?text=Here's your bill! Click to view: ${pdfDataUri}`;
       window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
     } catch (error) {
       console.error("Error generating or sharing PDF:", error);
-      alert("Failed to generate or share PDF. Please try again.");
+      toast({
+        title: "Failed to generate or share PDF",
+        description: "Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -285,3 +305,4 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
     </Dialog>
   );
 }
+
