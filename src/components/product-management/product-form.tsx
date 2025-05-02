@@ -23,6 +23,7 @@ import { DialogClose } from '@/components/ui/dialog'; // Import DialogClose for 
 import { getCategories } from '@/actions/category-actions'; // Import category action
 import { Textarea } from '@/components/ui/textarea';
 
+// Schema includes newCategory for validation when 'Add New Category' is selected
 const formSchema = z.object({
   name: z.string().min(2, {
     message: "Product name must be at least 2 characters.",
@@ -35,12 +36,21 @@ const formSchema = z.object({
     message: "Price must be a positive number.",
   }),
   description: z.string().optional(),
-})
+}).refine(data => {
+    // If category is 'Add New Category', then newCategory must not be empty
+    if (data.category === 'Add New Category') {
+      return !!data.newCategory && data.newCategory.trim() !== '';
+    }
+    return true;
+  }, {
+    // Custom error message if refinement fails
+    message: 'New category name is required.',
+    path: ['newCategory'], // Path of the error
+});
 
-// Removed hardcoded productCategories
 
 interface ProductFormProps {
-  onSubmit: (values: z.infer<typeof formSchema>) => void | Promise<void>;
+  onSubmit: (values: Omit<z.infer<typeof formSchema>, 'newCategory'> & { category: string }) => void | Promise<void>; // Submit only the final category name
   initialData?: Product | null;
   buttonText?: string;
   isSubmitting?: boolean;
@@ -57,9 +67,7 @@ export function ProductForm({
   const [categories, setCategories] = React.useState<ComboboxOption[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = React.useState(true);
   const [showNewCategoryInput, setShowNewCategoryInput] = React.useState(false);
-  // Added state to store the currently selected category
-  const [selectedCategory, setSelectedCategory] = React.useState(initialData?.category || "");
-
+  // Removed selectedCategory state - will rely on form state
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -90,47 +98,59 @@ export function ProductForm({
     fetchCategories();
   }, []);
 
-  // Update form default values if initialData changes
+  // Update form default values if initialData changes (e.g., when editing)
   React.useEffect(() => {
     if (initialData) {
       form.reset({
         name: initialData.name,
-        category: initialData.category,
+        category: initialData.category, // Set the initial category in the form state
         price: initialData.price,
         description: initialData.description || "",
         newCategory: "", // Reset new category input
       });
-      setShowNewCategoryInput(false); // Hide new category input if editing
-      setSelectedCategory(initialData.category);
-    } else {
-      form.reset({ name: "", category: "", price: 0, description: "", newCategory: "" }); // Reset for add mode
+      // Hide new category input if editing an existing product
       setShowNewCategoryInput(false);
-      setSelectedCategory("");
+    } else {
+      // Reset form for adding a new product
+      form.reset({ name: "", category: "", price: 0, description: "", newCategory: "" });
+      setShowNewCategoryInput(false);
     }
-  }, [initialData, form]);
+  }, [initialData, form.reset]); // Depend on form.reset to avoid potential issues
 
+   // Watch the category field to show/hide the new category input
+   const watchedCategory = form.watch('category');
+   React.useEffect(() => {
+       setShowNewCategoryInput(watchedCategory === 'Add New Category');
+       // Clear the new category input if a different category is selected
+       if (watchedCategory !== 'Add New Category') {
+         form.setValue('newCategory', '');
+       }
+   }, [watchedCategory, form.setValue]);
 
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
-      // If the category entered is "Add New Category", use the newCategory value
-      let categoryValue = values.category;
-      if (values.category === 'Add New Category') {
-          if (!values.newCategory || values.newCategory.trim() === '') {
-              // Handle error: new category name is required
-              form.setError('newCategory', { type: 'required', message: 'New category name is required.' });
-              return;
-          }
-          categoryValue = values.newCategory.trim();
+      let finalCategory = values.category;
+      // If 'Add New Category' was selected and validated, use the new category name
+      if (values.category === 'Add New Category' && values.newCategory) {
+          finalCategory = values.newCategory.trim();
       }
 
-    const isNewCategory = !categories.some(cat => cat.value === categoryValue);
-    if (isNewCategory && categoryValue.trim()) {
-       // Optionally: You could add logic here to explicitly confirm adding a new category
-       console.log("Adding new category:", categoryValue);
-       // Add the new category to the state so it appears immediately if needed,
-       // although getCategories will fetch it next time anyway.
-       setCategories(prev => [...prev, { label: categoryValue, value: categoryValue }]);
-    }
-    await onSubmit({...values, category: categoryValue});
+      const isNewCategory = !categories.some(cat => cat.value === finalCategory);
+      if (isNewCategory && finalCategory) {
+         console.log("Adding new category:", finalCategory);
+         // Add the new category to the state optimistically
+         // The backend action should handle the actual creation if needed
+         setCategories(prev => [...prev, { label: finalCategory, value: finalCategory }]);
+      }
+
+      // Prepare data for submission, excluding the temporary newCategory field
+      const dataToSubmit = {
+        name: values.name,
+        category: finalCategory,
+        price: values.price,
+        description: values.description,
+      };
+
+      await onSubmit(dataToSubmit);
   }
 
   return (
@@ -153,30 +173,28 @@ export function ProductForm({
           control={form.control}
           name="category"
           render={({ field }) => {
-            const categoryOptions = [...categories];
-            if (!showNewCategoryInput) {
-              categoryOptions.push({ label: 'Add New Category', value: 'Add New Category' });
-            }
+             // Dynamically add 'Add New Category' option if not already showing the input
+             const categoryOptions = [...categories];
+             if (!showNewCategoryInput) {
+               // Ensure it's not added if it somehow already exists as a real category
+               if (!categories.some(c => c.value === 'Add New Category')) {
+                   categoryOptions.push({ label: 'Add New Category', value: 'Add New Category' });
+               }
+             }
+
             return (
               <FormItem className="flex flex-col"> {/* Ensure proper layout for Combobox */}
                 <FormLabel>Category</FormLabel>
+                 {/* Use field.value and field.onChange from react-hook-form */}
                 <Combobox
                    options={categoryOptions}
-                   value={selectedCategory}
-                   onChange={(value) => {
-                      // Allow selecting or typing a new category
-                      setSelectedCategory(value);
-                      form.setValue('category', value);
-                      setShowNewCategoryInput(value === 'Add New Category');
-                   }}
+                   value={field.value} // Use form state value
+                   onChange={field.onChange} // Use form state onChange
                    placeholder="Select or type category..."
                    searchPlaceholder="Search or add category..."
                    emptyPlaceholder={isLoadingCategories ? "Loading categories..." : "No categories found. Type to add."}
                    disabled={isSubmitting || isLoadingCategories}
-                   // Allow creating new entries implicitly by typing
-                   // Note: The Combobox provided doesn't explicitly have a 'create' prop,
-                   // it relies on the onChange handler and form submission logic.
-                   // We update the field value directly.
+                   allowCustomValue // Allow typing custom values (handled on submit)
                  />
                  {isLoadingCategories && <Loader2 className="h-4 w-4 animate-spin mt-1" />}
                 <FormMessage />
@@ -198,8 +216,10 @@ export function ProductForm({
                      placeholder="Enter new category name"
                      {...field}
                      disabled={isSubmitting}
+                     // autoFocus // Optionally focus when it appears
                    />
                  </FormControl>
+                 {/* Display validation error specifically for newCategory */}
                  <FormMessage />
                </FormItem>
              )}
@@ -226,7 +246,7 @@ export function ProductForm({
                   <FormItem>
                       <FormLabel>Description</FormLabel>
                       <FormControl>
-                          <Textarea placeholder="Enter product description" {...field} disabled={isSubmitting} />
+                          <Textarea placeholder="Enter product description (optional)" {...field} disabled={isSubmitting} />
                       </FormControl>
                       <FormMessage />
                   </FormItem>
@@ -234,11 +254,13 @@ export function ProductForm({
           />
         <div className="flex justify-end space-x-2 pt-4">
           {/* Cancel Button */}
-          <DialogClose asChild>
-            <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
-              Cancel
-            </Button>
-          </DialogClose>
+          {onCancel && ( // Only show Cancel if handler is provided
+              <DialogClose asChild>
+                <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
+                  Cancel
+                </Button>
+              </DialogClose>
+          )}
           {/* Submit Button */}
           <Button type="submit" disabled={isSubmitting || isLoadingCategories}>
             {isSubmitting ? (
@@ -254,3 +276,5 @@ export function ProductForm({
     </Form>
   )
 }
+
+    

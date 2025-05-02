@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -36,6 +37,7 @@ interface ComboboxProps {
   triggerClassName?: string
   inputId?: string;
   disabled?: boolean; // Add disabled prop
+  allowCustomValue?: boolean; // Allow typing custom values
 }
 
 export function Combobox({
@@ -48,18 +50,25 @@ export function Combobox({
   className,
   triggerClassName,
   inputId,
-  disabled = false, // Default disabled to false
+  disabled = false,
+  allowCustomValue = false, // Default to false
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
-  // Store the input value separately to allow typing new entries
-  const [inputValue, setInputValue] = React.useState(value || "");
+  // Store the input value separately to allow typing new entries if allowCustomValue is true
+  const [inputValue, setInputValue] = React.useState("");
+
+  // Find the label for the currently selected value to display in the trigger
+  const selectedOption = options.find((option) => option.value === value);
+  const displayLabel = selectedOption?.label || (allowCustomValue && value ? value : placeholder); // Show value if custom/not found
 
   React.useEffect(() => {
-    // Sync input value if the external value changes
-    if (value !== inputValue) {
-        setInputValue(value || "");
-    }
-  }, [value, inputValue]);
+    // Sync input value with external value when popover opens or value changes externally
+     if (value) {
+       setInputValue(selectedOption?.label || (allowCustomValue ? value : ""));
+     } else {
+       setInputValue("");
+     }
+  }, [value, selectedOption, allowCustomValue, open]);
 
 
   const groupedOptions = React.useMemo(() => {
@@ -71,11 +80,21 @@ export function Combobox({
       }
       groups[groupKey].push(option)
     })
+    // Sort groups if needed, e.g., Object.keys(groups).sort()...
     return groups
   }, [options])
 
-  // Find the label for the currently selected value
-  const selectedLabel = options.find((option) => option.value === value)?.label || value // Fallback to value if label not found
+
+  // Handle selection from the list or adding a custom value
+  const handleSelect = (currentValue: string) => {
+    // currentValue here is the `value` prop from CommandItem (option.value or inputValue)
+    onChange(currentValue);
+    setOpen(false);
+    // Update input display to the selected label or the custom value
+    const selectedOpt = options.find(opt => opt.value === currentValue);
+    setInputValue(selectedOpt?.label || (allowCustomValue ? currentValue : ""));
+  };
+
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -89,20 +108,20 @@ export function Combobox({
           className={cn("w-full justify-between", !value && "text-muted-foreground", className)}
           disabled={disabled} // Apply disabled prop
         >
-          {/* Display the selected label or placeholder */}
            <span className="truncate">
-              {value ? selectedLabel : placeholder}
+              {displayLabel}
            </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
         <Command
-           // Filter based on the input value for dynamic search/add
+           // Filter based on the *label* for better user experience
            filter={(itemValue, search) => {
-              // itemValue is the `value` prop of CommandItem (which we set to option.label)
+              // itemValue is the `value` prop of CommandItem (option.label)
               // search is the current input in CommandInput
-              if (itemValue.toLowerCase().includes(search.toLowerCase())) return 1;
+              const label = options.find(opt => opt.value === itemValue)?.label || itemValue;
+              if (label.toLowerCase().includes(search.toLowerCase())) return 1;
               return 0;
             }}
           >
@@ -110,21 +129,25 @@ export function Combobox({
              placeholder={searchPlaceholder}
              aria-label={searchPlaceholder}
              value={inputValue}
-             onValueChange={setInputValue} // Update internal input state
+             onValueChange={(search) => {
+                setInputValue(search);
+                // If allowing custom values, immediately update the external state
+                // This might be too aggressive depending on use case, adjust if needed
+                if (allowCustomValue) {
+                  onChange(search);
+                }
+              }}
              disabled={disabled} // Apply disabled prop
            />
           <CommandList>
             <CommandEmpty>
               {emptyPlaceholder}
-              {/* Optionally, add a button/indicator to explicitly add the typed value */}
-               {inputValue && !options.some(opt => opt.label.toLowerCase() === inputValue.toLowerCase()) && (
+              {/* Show option to add custom value if allowed and input is not empty and doesn't match existing option */}
+               {allowCustomValue && inputValue && !options.some(opt => opt.label.toLowerCase() === inputValue.toLowerCase() || opt.value.toLowerCase() === inputValue.toLowerCase()) && (
                  <CommandItem
                    key={`add-${inputValue}`}
-                   value={inputValue} // Use input value for matching
-                   onSelect={() => {
-                     onChange(inputValue); // Set the typed value
-                     setOpen(false);
-                   }}
+                   value={inputValue} // Use input value for the 'add' item's value
+                   onSelect={() => handleSelect(inputValue)}
                  >
                    Add "{inputValue}"
                  </CommandItem>
@@ -135,13 +158,8 @@ export function Combobox({
                 {groupOptions.map((option) => (
                   <CommandItem
                     key={option.value}
-                    value={option.label} // Search/filter based on label
-                    onSelect={() => {
-                      const newValue = option.value === value ? "" : option.value;
-                      onChange(newValue); // Use option.value when selecting from list
-                      setInputValue(newValue ? option.label : ""); // Update input field display
-                      setOpen(false);
-                    }}
+                    value={option.value} // Use option.value for selection logic
+                    onSelect={() => handleSelect(option.value)}
                     disabled={disabled} // Apply disabled prop
                   >
                     <Check
@@ -162,3 +180,4 @@ export function Combobox({
   )
 }
 
+    
