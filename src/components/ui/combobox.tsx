@@ -35,7 +35,8 @@ interface ComboboxProps {
   emptyPlaceholder?: string
   className?: string
   triggerClassName?: string
-  inputId?: string; // Add inputId prop
+  inputId?: string;
+  disabled?: boolean; // Add disabled prop
 }
 
 export function Combobox({
@@ -47,9 +48,18 @@ export function Combobox({
   emptyPlaceholder = "No option found.",
   className,
   triggerClassName,
-  inputId, // Destructure inputId
+  inputId,
+  disabled = false, // Default disabled to false
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
+  // Store the input value separately to allow typing new entries
+  const [inputValue, setInputValue] = React.useState(value || "");
+
+  React.useEffect(() => {
+    // Sync input value if the external value changes
+    setInputValue(value || "");
+  }, [value]);
+
 
   const groupedOptions = React.useMemo(() => {
     const groups: { [key: string]: ComboboxOption[] } = {}
@@ -63,38 +73,75 @@ export function Combobox({
     return groups
   }, [options])
 
-  const selectedLabel = options.find((option) => option.value === value)?.label
+  // Find the label for the currently selected value
+  const selectedLabel = options.find((option) => option.value === value)?.label || value // Fallback to value if label not found
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild className={triggerClassName}>
         <Button
-          id={inputId} // Set the id on the trigger button
+          id={inputId}
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          aria-labelledby={inputId ? `${inputId}-label` : undefined} // Associate with label if inputId is provided
+          aria-labelledby={inputId ? `${inputId}-label` : undefined}
           className={cn("w-full justify-between", !value && "text-muted-foreground", className)}
+          disabled={disabled} // Apply disabled prop
         >
-          {value ? selectedLabel : placeholder}
+          {/* Display the selected label or placeholder */}
+           <span className="truncate">
+              {value ? selectedLabel : placeholder}
+           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-        <Command>
-          <CommandInput placeholder={searchPlaceholder} aria-label={searchPlaceholder} />
+        <Command
+           // Filter based on the input value for dynamic search/add
+           filter={(itemValue, search) => {
+              // itemValue is the `value` prop of CommandItem (which we set to option.label)
+              // search is the current input in CommandInput
+              if (itemValue.toLowerCase().includes(search.toLowerCase())) return 1;
+              return 0;
+            }}
+          >
+          <CommandInput
+             placeholder={searchPlaceholder}
+             aria-label={searchPlaceholder}
+             value={inputValue}
+             onValueChange={setInputValue} // Update internal input state
+             disabled={disabled} // Apply disabled prop
+           />
           <CommandList>
-            <CommandEmpty>{emptyPlaceholder}</CommandEmpty>
+            <CommandEmpty>
+              {emptyPlaceholder}
+              {/* Optionally, add a button/indicator to explicitly add the typed value */}
+               {inputValue && !options.some(opt => opt.label.toLowerCase() === inputValue.toLowerCase()) && (
+                 <CommandItem
+                   key={`add-${inputValue}`}
+                   value={inputValue} // Use input value for matching
+                   onSelect={() => {
+                     onChange(inputValue); // Set the typed value
+                     setOpen(false);
+                   }}
+                 >
+                   Add "{inputValue}"
+                 </CommandItem>
+               )}
+            </CommandEmpty>
             {Object.entries(groupedOptions).map(([groupKey, groupOptions]) => (
               <CommandGroup key={groupKey} heading={groupKey !== "__default__" ? groupKey : undefined}>
                 {groupOptions.map((option) => (
                   <CommandItem
                     key={option.value}
-                    value={option.label} // Search based on label
+                    value={option.label} // Search/filter based on label
                     onSelect={() => {
-                      onChange(option.value === value ? "" : option.value)
-                      setOpen(false)
+                      const newValue = option.value === value ? "" : option.value;
+                      onChange(newValue); // Use option.value when selecting from list
+                      setInputValue(newValue ? option.label : ""); // Update input field display
+                      setOpen(false);
                     }}
+                    disabled={disabled} // Apply disabled prop
                   >
                     <Check
                       className={cn(

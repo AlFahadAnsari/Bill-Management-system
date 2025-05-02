@@ -2,7 +2,7 @@
 "use client"
 
 import * as React from "react"
-import { PlusCircle, Printer, ReceiptText, User } from "lucide-react" // Added User icon
+import { PlusCircle, Printer, ReceiptText, User, Loader2 } from "lucide-react" // Added Loader2
 
 import type { Product, BillItem } from "@/types"
 import { Button } from "@/components/ui/button"
@@ -17,11 +17,12 @@ import {
   TableFooter
 } from "@/components/ui/table"
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox"
-import { Input } from "@/components/ui/input" // Added Input import
-import { Label } from "@/components/ui/label" // Added Label import
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { BillItemRow } from "./bill-item-row"
 import { BillPreviewDialog } from "./bill-preview-dialog"
 import { useToast } from "@/hooks/use-toast"
+// No need to import getCategories here if products already contain category info
 
 interface BillGeneratorProps {
   availableProducts: Product[];
@@ -30,21 +31,42 @@ interface BillGeneratorProps {
 export function BillGenerator({ availableProducts }: BillGeneratorProps) {
   const [billItems, setBillItems] = React.useState<BillItem[]>([])
   const [selectedProductId, setSelectedProductId] = React.useState<string>("")
-  const [clientName, setClientName] = React.useState<string>("") // State for client name
+  const [clientName, setClientName] = React.useState<string>("")
   const [showPreview, setShowPreview] = React.useState(false)
   const { toast } = useToast();
 
+  // No need for separate category fetching if availableProducts includes categories
+  // const [categories, setCategories] = React.useState<ComboboxOption[]>([]);
+  // const [isLoadingCategories, setIsLoadingCategories] = React.useState(true);
+
+  // Group products by category for the Combobox
   const productOptions: ComboboxOption[] = React.useMemo(() => {
     const grouped: { [category: string]: ComboboxOption[] } = {};
     availableProducts.forEach(p => {
-      if (!grouped[p.category]) {
-        grouped[p.category] = [];
+      const category = p.category || "Uncategorized"; // Handle potential missing category
+      if (!grouped[category]) {
+        grouped[category] = [];
       }
-      grouped[p.category].push({ value: p.id, label: `${p.name} (₹${p.price.toFixed(2)})`, group: p.category }); // Changed $ to ₹
+      grouped[category].push({
+          value: p.id,
+          label: `${p.name} (₹${p.price.toFixed(2)})`,
+          group: category // Use the category for grouping
+        });
     });
 
+    // Sort categories alphabetically
+    const sortedCategories = Object.keys(grouped).sort();
+
     // Flatten grouped options while keeping the group structure for the Combobox
-    return Object.values(grouped).flat();
+    let flatOptions: ComboboxOption[] = [];
+    sortedCategories.forEach(category => {
+        // Sort products within each category alphabetically by name
+        grouped[category].sort((a, b) => a.label.localeCompare(b.label));
+        flatOptions = flatOptions.concat(grouped[category]);
+    });
+
+    return flatOptions;
+
   }, [availableProducts]);
 
 
@@ -64,10 +86,8 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
     const existingItemIndex = billItems.findIndex(item => item.id === productToAdd.id);
 
     if (existingItemIndex > -1) {
-      // If item exists, just increment quantity
       handleQuantityChange(productToAdd.id, billItems[existingItemIndex].quantity + 1);
     } else {
-      // Add new item with quantity 1
       setBillItems([...billItems, { ...productToAdd, quantity: 1 }]);
     }
     setSelectedProductId(""); // Reset combobox after adding
@@ -76,7 +96,7 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
   const handleQuantityChange = (productId: string, newQuantity: number) => {
     setBillItems(currentItems =>
       currentItems.map(item =>
-        item.id === productId ? { ...item, quantity: newQuantity } : item
+        item.id === productId ? { ...item, quantity: Math.max(0, newQuantity) } : item // Ensure quantity doesn't go below 0
       )
     );
   };
@@ -102,7 +122,9 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
        });
        return;
      }
-    if (billItems.length === 0 || billItems.every(item => item.quantity === 0)) {
+    // Filter items with quantity > 0 *before* checking length
+    const itemsToInclude = billItems.filter(item => item.quantity > 0);
+    if (itemsToInclude.length === 0) {
        toast({
          title: "Cannot Generate Bill",
          description: "Please add products with quantities greater than zero to the bill.",
@@ -141,18 +163,31 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
           <div className="flex items-end gap-2">
             <div className="flex-grow">
               <Label htmlFor="product-select" className="text-sm font-medium mb-1 block">Select Product</Label>
-              <Combobox
-                options={productOptions}
-                value={selectedProductId}
-                onChange={setSelectedProductId}
-                placeholder="Select a product..."
-                searchPlaceholder="Search products..."
-                emptyPlaceholder="No products found."
-                triggerClassName="h-10" // Match button height
-                inputId="product-select" // Link label
-              />
+               {/* Conditionally render loader or combobox */}
+              {productOptions.length === 0 && availableProducts.length === 0 ? ( // Check if products are actually available
+                 <div className="flex items-center justify-center h-10 border rounded-md bg-muted text-muted-foreground">
+                   <span>No products available in admin panel.</span>
+                 </div>
+               ) : (
+                  <Combobox
+                    options={productOptions}
+                    value={selectedProductId}
+                    onChange={setSelectedProductId}
+                    placeholder="Select a product..."
+                    searchPlaceholder="Search products..."
+                    emptyPlaceholder="No products found."
+                    triggerClassName="h-10" // Match button height
+                    inputId="product-select" // Link label
+                    // disabled={isLoadingCategories} // Disable while loading categories
+                  />
+              )}
             </div>
-            <Button onClick={addProductToBill} aria-label="Add selected product to bill" className="h-10">
+            <Button
+               onClick={addProductToBill}
+               aria-label="Add selected product to bill"
+               className="h-10"
+               disabled={!selectedProductId || productOptions.length === 0} // Disable if no product selected or no options
+            >
               <PlusCircle className="mr-2 h-4 w-4" /> Add to Bill
             </Button>
           </div>
@@ -173,7 +208,7 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
                <TableBody>
                  {billItems.length === 0 ? (
                    <TableRow>
-                     <TableCell colSpan={6} className="h-24 text-center">
+                     <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                        No items added to the bill yet.
                      </TableCell>
                    </TableRow>
@@ -192,7 +227,7 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
                  <TableFooter>
                    <TableRow className="bg-muted/50 font-semibold">
                      <TableCell colSpan={4} className="text-right">Total Amount:</TableCell>
-                     <TableCell className="text-right">₹{totalAmount.toFixed(2)}</TableCell> {/* Changed $ to ₹ */}
+                     <TableCell className="text-right font-bold text-lg">₹{totalAmount.toFixed(2)}</TableCell>
                      <TableCell></TableCell> {/* Empty cell for remove column */}
                    </TableRow>
                  </TableFooter>
@@ -201,7 +236,12 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
           </div>
         </CardContent>
         <CardFooter className="flex justify-end">
-          <Button onClick={handleGenerateBill} className="bg-accent text-accent-foreground hover:bg-accent/90">
+          <Button
+             onClick={handleGenerateBill}
+             className="bg-accent text-accent-foreground hover:bg-accent/90"
+             // Disable if no client name or no items with quantity > 0
+             disabled={!clientName.trim() || billItems.filter(item => item.quantity > 0).length === 0}
+          >
             <Printer className="mr-2 h-4 w-4" /> Generate & Preview Bill
           </Button>
         </CardFooter>
