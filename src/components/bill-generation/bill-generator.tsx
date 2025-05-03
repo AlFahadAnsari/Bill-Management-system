@@ -3,7 +3,7 @@
 import * as React from "react"
 import { PlusCircle, Printer, ReceiptText, User, Loader2 } from "lucide-react" // Added Loader2
 
-import type { Product, BillItem } from "@/types"
+import type { Product, BillItem } from "@/types" // Keep base types
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import {
@@ -21,51 +21,45 @@ import { Label } from "@/components/ui/label"
 import { BillItemRow } from "./bill-item-row"
 import { BillPreviewDialog } from "./bill-preview-dialog"
 import { useToast } from "@/hooks/use-toast"
-// No need to import getCategories here if products already contain category info
 
 interface BillGeneratorProps {
   availableProducts: Product[];
 }
 
+// Define the extended type for state management within this component
+interface BillItemWithBillPrice extends BillItem {
+  billPrice?: number; // Optional price for this specific bill item
+}
+
 export function BillGenerator({ availableProducts }: BillGeneratorProps) {
-  const [billItems, setBillItems] = React.useState<BillItem[]>([])
+  // Use the extended type for the bill items state
+  const [billItems, setBillItems] = React.useState<BillItemWithBillPrice[]>([])
   const [selectedProductId, setSelectedProductId] = React.useState<string>("")
   const [clientName, setClientName] = React.useState<string>("")
   const [showPreview, setShowPreview] = React.useState(false)
   const { toast } = useToast();
 
-  // No need for separate category fetching if availableProducts includes categories
-  // const [categories, setCategories] = React.useState<ComboboxOption[]>([]);
-  // const [isLoadingCategories] = React.useState(true);
-
-  // Group products by category for the Combobox
   const productOptions: ComboboxOption[] = React.useMemo(() => {
     const grouped: { [category: string]: ComboboxOption[] } = {};
     availableProducts.forEach(p => {
-      const category = p.category || "Uncategorized"; // Handle potential missing category
+      const category = p.category || "Uncategorized";
       if (!grouped[category]) {
         grouped[category] = [];
       }
       grouped[category].push({
           value: p.id,
           label: `${p.name} (₹${p.price.toFixed(2)})`,
-          group: category // Use the category for grouping
+          group: category
         });
     });
 
-    // Sort categories alphabetically
     const sortedCategories = Object.keys(grouped).sort();
-
-    // Flatten grouped options while keeping the group structure for the Combobox
     let flatOptions: ComboboxOption[] = [];
     sortedCategories.forEach(category => {
-        // Sort products within each category alphabetically by name
         grouped[category].sort((a, b) => a.label.localeCompare(b.label));
         flatOptions = flatOptions.concat(grouped[category]);
     });
-
     return flatOptions;
-
   }, [availableProducts]);
 
 
@@ -80,25 +74,44 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
     }
 
     const productToAdd = availableProducts.find(p => p.id === selectedProductId);
-    if (!productToAdd) return; // Should not happen if selectedProductId is valid
+    if (!productToAdd) return;
 
     const existingItemIndex = billItems.findIndex(item => item.id === productToAdd.id);
 
     if (existingItemIndex > -1) {
-      handleQuantityChange(productToAdd.id, billItems[existingItemIndex].quantity + 1);
+      // If item exists, just increase quantity (don't reset potential price override)
+      handleItemChange(productToAdd.id, 'quantity', billItems[existingItemIndex].quantity + 1);
     } else {
+      // Add new item, initially using the product's price (no billPrice override yet)
       setBillItems([...billItems, { ...productToAdd, quantity: 1 }]);
     }
     setSelectedProductId(""); // Reset combobox after adding
   };
 
-  const handleQuantityChange = (productId: string, newQuantity: number) => {
+  // Unified handler for changing quantity or price
+  const handleItemChange = (productId: string, field: 'quantity' | 'billPrice', value: number) => {
     setBillItems(currentItems =>
-      currentItems.map(item =>
-        item.id === productId ? { ...item, quantity: Math.max(0, newQuantity) } : item // Ensure quantity doesn't go below 0
-      )
+      currentItems.map(item => {
+        if (item.id === productId) {
+          if (field === 'quantity') {
+            return { ...item, quantity: Math.max(0, value) }; // Ensure quantity >= 0
+          } else if (field === 'billPrice') {
+            // If the new price matches the original product price, remove the override
+             const originalProductPrice = availableProducts.find(p => p.id === productId)?.price;
+             if (value === originalProductPrice) {
+                const { billPrice, ...rest } = item; // Remove billPrice property
+                return rest; // Return item without billPrice override
+             } else {
+                return { ...item, billPrice: Math.max(0, value) }; // Ensure price >= 0 and update/add billPrice
+             }
+
+          }
+        }
+        return item;
+      })
     );
   };
+
 
   const handleRemoveItem = (productId: string) => {
     setBillItems(currentItems => currentItems.filter(item => item.id !== productId));
@@ -109,7 +122,11 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
   };
 
   const totalAmount = React.useMemo(() => {
-    return billItems.reduce((total, item) => total + item.price * item.quantity, 0);
+    return billItems.reduce((total, item) => {
+        // Use overridden price if available, otherwise original price
+        const priceToUse = item.billPrice ?? item.price;
+        return total + priceToUse * item.quantity;
+    }, 0);
   }, [billItems]);
 
   const handleGenerateBill = () => {
@@ -121,7 +138,6 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
        });
        return;
      }
-    // Filter items with quantity > 0 *before* checking length
     const itemsToInclude = billItems.filter(item => item.quantity > 0);
     if (itemsToInclude.length === 0) {
        toast({
@@ -131,8 +147,20 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
        });
       return;
     }
+    // Pass the potentially modified items to the preview
     setShowPreview(true);
   };
+
+   // Prepare items for preview, ensuring the correct price is used
+   const itemsForPreview = React.useMemo(() => {
+       return billItems
+           .filter(item => item.quantity > 0)
+           .map(item => ({
+               ...item,
+               price: item.billPrice ?? item.price, // Use the billPrice for the preview/PDF if it exists
+           }));
+   }, [billItems]);
+
 
   return (
     <>
@@ -162,8 +190,7 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
           <div className="flex items-end gap-2">
             <div className="flex-grow">
               <Label htmlFor="product-select" className="text-sm font-medium mb-1 block">Select Product</Label>
-               {/* Conditionally render loader or combobox */}
-              {productOptions.length === 0 && availableProducts.length === 0 ? ( // Check if products are actually available
+               {productOptions.length === 0 && availableProducts.length === 0 ? (
                  <div className="flex items-center justify-center h-10 border rounded-md bg-muted text-muted-foreground">
                    <span>No products available in admin panel.</span>
                  </div>
@@ -175,9 +202,8 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
                     placeholder="Select a product..."
                     searchPlaceholder="Search products..."
                     emptyPlaceholder="No products found."
-                    triggerClassName="h-10" // Match button height
-                    inputId="product-select" // Link label
-                    // disabled={isLoadingCategories} // Disable while loading categories
+                    triggerClassName="h-10"
+                    inputId="product-select"
                   />
               )}
             </div>
@@ -185,7 +211,7 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
                onClick={addProductToBill}
                aria-label="Add selected product to bill"
                className="h-10"
-               disabled={!selectedProductId || productOptions.length === 0} // Disable if no product selected or no options
+               disabled={!selectedProductId || productOptions.length === 0}
             >
               <PlusCircle className="mr-2 h-4 w-4" /> Add to Bill
             </Button>
@@ -216,7 +242,8 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
                      <BillItemRow
                        key={item.id}
                        item={item}
-                       onQuantityChange={handleQuantityChange}
+                       // Pass the unified handler
+                       onItemChange={handleItemChange}
                        onRemove={handleRemoveItem}
                      />
                    ))
@@ -238,7 +265,6 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
           <Button
              onClick={handleGenerateBill}
              className="bg-accent text-accent-foreground hover:bg-accent/90"
-             // Disable if no client name or no items with quantity > 0
              disabled={!clientName.trim() || billItems.filter(item => item.quantity > 0).length === 0}
           >
             <Printer className="mr-2 h-4 w-4" /> Generate & Preview Bill
@@ -249,12 +275,11 @@ export function BillGenerator({ availableProducts }: BillGeneratorProps) {
       <BillPreviewDialog
           isOpen={showPreview}
           onClose={() => setShowPreview(false)}
-          clientName={clientName} // Pass client name
-          items={billItems.filter(item => item.quantity > 0)} // Only include items with quantity > 0
+          clientName={clientName}
+          // Pass the specially prepared items with potentially overridden prices
+          items={itemsForPreview}
           totalAmount={totalAmount}
         />
     </>
   )
 }
-
-

@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Printer, X } from 'lucide-react';
 
-import type { BillItem } from '@/types';
+import type { BillItem } from '@/types'; // Use base BillItem type, as price is handled before passing
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -16,8 +16,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { jsPDF } from 'jspdf';
-// Correct import for autoTable
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable'; // Correct import for autoTable plugin
 import { useToast } from "@/hooks/use-toast"; // Import useToast
 
 // Inline SVG for WhatsApp icon
@@ -32,7 +31,7 @@ interface BillPreviewDialogProps {
   isOpen: boolean;
   onClose: () => void;
   clientName: string;
-  items: BillItem[];
+  items: BillItem[]; // Receive items with potentially overridden prices
   totalAmount: number;
 }
 
@@ -56,9 +55,8 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
 
-    // Add title and client information
-    doc.setFontSize(18);
     try {
+      doc.setFontSize(18);
       doc.text('Bill / Invoice', 14, 20);
 
       doc.setFontSize(12);
@@ -66,11 +64,11 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
       doc.text(`Date: ${printDate ? printDate.toLocaleDateString() : 'N/A'}`, 14, 36);
       doc.text(`Time: ${currentTime || 'N/A'}`, 14, 42);
 
-      // Prepare table data
       const tableColumn = ["Product", "Qty", "Unit Price", "Total"];
-      const tableRows: string[][] = [];
+      const tableRows: (string | number)[][] = []; // Use mixed type array
 
       items.forEach(item => {
+          // Use the price from the item object directly (it's already the overridden price if applicable)
           tableRows.push([
               item.name,
               item.quantity.toString(),
@@ -79,63 +77,68 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
           ]);
       });
 
-      // Add table to the PDF
-      try {
-        (doc as any).autoTable({
+       // Add table using autoTable
+        autoTable(doc, {
             head: [tableColumn],
             body: tableRows,
             startY: 50,
-            didDrawPage: (data: any) => { // Function to add total amount at the end of the table
+            didDrawPage: (data: any) => {
+                // Use jsPDF methods directly on the doc object for footer text
                 doc.setFontSize(14);
                 const totalAmtText = `Total Amount: ₹${totalAmount.toFixed(2)}`;
                 const textWidth = doc.getTextWidth(totalAmtText);
-                const x = pageWidth - textWidth - 14;
-                doc.text(totalAmtText, x, data.table.finalY + 15);
-            }
+                const x = pageWidth - textWidth - data.settings.margin.right; // Use margin setting
+                const y = data.cursor?.y ? data.cursor.y + 15 : pageHeight - 15; // Position below table or near bottom
+                doc.text(totalAmtText, x, y);
+            },
+            margin: { right: 14, left: 14 } // Ensure consistent margins
         });
-        // Convert to base64
-        const pdfDataUri = doc.output('datauristring');
-        return pdfDataUri;
 
-      } catch (tableError: any) {
-         console.error("Error generating PDF table:", tableError);
-          toast({
-            title: "PDF Generation Failed",
-            description: `Failed to generate PDF table. Please try again. ${tableError.message}`,
-            variant: "destructive",
-          });
-        return null;
-      }
-  } catch (error: any) {
-     console.error("Error generating PDF text:", error);
+
+      const pdfDataUri = doc.output('datauristring');
+      return pdfDataUri;
+
+    } catch (error: any) {
+      console.error("Error generating PDF:", error);
       toast({
         title: "PDF Generation Failed",
-        description: `Failed to generate PDF text. Please try again. ${error.message}`,
+        description: `Failed to generate PDF. Please check console for details. Error: ${error.message}`,
         variant: "destructive",
       });
-    return null;
-  }
-};
-
-  const handleWhatsAppShare = async () => {
-    try {
-      const pdfDataUri = await generatePdf();
-       if (!pdfDataUri) {
-         // generatePdf already shows a toast on failure, so we don't need another one here.
-         return;
-       }
-
-      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent("Here's your bill! Click to view:")} ${encodeURIComponent(pdfDataUri)}`;
-      window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
-    } catch (error) {
-      console.error("Error generating or sharing PDF:", error);
-      toast({
-        title: "Failed to generate or share PDF",
-        description: "Please try again.",
-        variant: "destructive",
-      });
+      return null;
     }
   };
+
+  const handleWhatsAppShare = async () => {
+      const pdfDataUri = await generatePdf();
+      if (!pdfDataUri) {
+          return; // Error handled in generatePdf
+      }
+
+      // Basic text message linking to the PDF (Direct PDF sharing via URL is complex and unreliable across devices)
+      // You might need a backend service to host the PDF and provide a shareable link.
+      const message = `Hi ${clientName},\n\nHere is your bill: [View PDF]\n\nTotal Amount: ₹${totalAmount.toFixed(2)}\n\nPlease note: Direct PDF sharing is not supported via this link. Consider downloading and sending manually if needed.`;
+
+      // For demonstration, we'll keep the text-based approach.
+      // Sharing the full Data URI in the text might exceed URL length limits.
+      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+
+      try {
+          window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+          toast({
+              title: "WhatsApp Share Initiated",
+              description: "Please complete the sharing process in WhatsApp. Note: Direct PDF sharing is not fully supported.",
+          });
+      } catch (e) {
+          console.error("Could not open WhatsApp link:", e);
+          toast({
+              title: "Failed to open WhatsApp",
+              description: "Could not open the WhatsApp sharing link. Please ensure WhatsApp is installed or try sharing manually.",
+              variant: "destructive",
+          });
+      }
+  };
+
 
   const handlePrint = () => {
     const content = billContentRef.current;
@@ -145,7 +148,6 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
          const styles = Array.from(document.styleSheets)
            .map(styleSheet => {
              try {
-               // Filter out cross-origin stylesheets
                if (styleSheet.href && !styleSheet.href.startsWith(window.location.origin)) {
                  return '';
                }
@@ -178,10 +180,10 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
                  .total-section { text-align: right; margin-top: 15px; font-size: 1.1rem; font-weight: bold; padding-top: 10px; border-top: 1px solid #eee;}
                  .footer { text-align: center; margin-top: 30px; font-size: 0.8rem; color: #777; }
                  @media print {
-                   body { margin: 0; } /* Remove margin for printing */
+                   body { margin: 0; }
                    .print-container { max-width: none; }
-                   .no-print { display: none; } /* Class to hide elements in print */
-                   .item-table th, .item-table td { font-size: 10pt; padding: 6px; } /* Adjust print font size */
+                   .no-print { display: none; }
+                   .item-table th, .item-table td { font-size: 10pt; padding: 6px; }
                    .client-info, .total-section { font-size: 11pt; }
                  }
                  ${styles}
@@ -194,13 +196,11 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
                    <p>Date Generated: ${printDate ? printDate.toLocaleString() : 'N/A'}</p>
                  </div>
                  <div ref="${billContentRef}" class="bill-content">
-                     {/* Client Info */}
                      <div class="mb-4 client-info">
                        <p><strong>Client:</strong> ${clientName}</p>
                        <p><strong>Date:</strong> ${printDate ? printDate.toLocaleDateString() : 'N/A'}</p>
                        <p><strong>Time:</strong> ${currentTime || 'N/A'}</p>
                      </div>
-                     {/* Items Table - regenerated here for print structure */}
                      <table class="w-full item-table">
                       <thead>
                         <tr>
@@ -221,7 +221,6 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
                         `).join('')}
                       </tbody>
                     </table>
-                    {/* Total Amount */}
                     <div class="text-right total-section">
                        <p><strong>Total Amount: ₹${totalAmount.toFixed(2)}</strong></p>
                     </div>
@@ -233,13 +232,12 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
         `);
         printWindow.document.close();
         printWindow.focus();
-        // Timeout ensures content is loaded before print dialog opens
         setTimeout(() => {
             printWindow.print();
             printWindow.close();
         }, 250);
       } else {
-         alert('Could not open print window. Please check your browser pop-up settings.');
+         toast({title: "Print Error", description: "Could not open print window. Please check pop-up settings.", variant: "destructive"});
       }
     }
   };
@@ -258,12 +256,11 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
         </DialogHeader>
 
         <ScrollArea className="max-h-[60vh] pr-6">
-           {/* This div is now mainly for screen display, print uses reconstructed HTML */}
           <div ref={billContentRef} className="text-sm p-1">
               <div className="mb-4 client-info">
                  <p><strong>Client:</strong> {clientName}</p>
                  <p><strong>Date:</strong> {printDate ? printDate.toLocaleDateString() : 'N/A'}</p>
-                 <p><strong>Time:</strong> {currentTime || 'N/A'}</p>
+                 <p><strong>Time:</strong> ${currentTime || 'N/A'}</p>
                </div>
 
 
@@ -283,6 +280,7 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
                   <tr key={item.id} className="border-b">
                     <td className="py-1">{item.name}</td>
                     <td className="text-center py-1">{item.quantity}</td>
+                    {/* Use the item's price (which might be overridden) */}
                     <td className="text-right py-1">₹{item.price.toFixed(2)}</td>
                     <td className="text-right py-1">₹{(item.price * item.quantity).toFixed(2)}</td>
                   </tr>
@@ -293,7 +291,7 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
             <Separator className="my-4" />
 
             <div className="text-right total-section">
-              <p><strong>Total Amount: ₹{totalAmount.toFixed(2)}</strong></p>
+              <p><strong>Total Amount: ₹${totalAmount.toFixed(2)}</strong></p>
             </div>
           </div>
         </ScrollArea>
@@ -316,5 +314,3 @@ export function BillPreviewDialog({ isOpen, onClose, clientName, items, totalAmo
     </Dialog>
   );
 }
-
-
